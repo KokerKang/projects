@@ -26,6 +26,12 @@ class Place:
         # Phase 1: Add an entrance to the exit
         # BEGIN Problem 2
         "*** YOUR CODE HERE ***"
+        """
+            처음 맨 왼쪽에 있는 place는 exit이 None으로 시작한다. 
+            그 다음 만들어지는 두번째 자리의 place의 exit은 처음 만들어진 place로 설정이 된다.
+            그러나 첫번째 만들어진 place의 entrance는 설정을 하지 않기 때문에, 우리는 
+            place에 exit이 있나 확인 후, 첫번째와 두번째의 exit 과 entrance를 설정 해주는 작업을 한다.
+        """
         if self.exit:
             self.exit.entrance = self
         # END Problem 2
@@ -56,6 +62,7 @@ class Insect:
 
     damage = 0
     # ADD CLASS ATTRIBUTES HERE
+    is_watersafe = False
 
     def __init__(self, health, place=None):
         """Create an Insect with a health amount and a starting PLACE."""
@@ -130,7 +137,13 @@ class Ant(Insect):
             place.ant = self
         else:
             # BEGIN Problem 8
-            assert place.ant is None, 'Two ants in {0}'.format(place)
+            if place.ant.can_contain(self) and place.ant.contained_ant is None:
+                place.ant.contain_ant(self)
+            elif self.is_container() and self.can_contain(place.ant):
+                self.contain_ant(place.ant)
+                place.ant = self
+            else:
+                assert place.ant is None, 'Two ants in {0}'.format(place)
             # END Problem 8
         Insect.add_to(self, place)
 
@@ -157,8 +170,12 @@ class HarvesterAnt(Ant):
     name = 'Harvester'
     implemented = True
     # OVERRIDE CLASS ATTRIBUTES HERE
+    """
+        푸드 코스트의 설정이 되어있지 않다. 그렇기에 class 속성을 부여하여 ,
+        food_cost 를 설정해 준다
+    """
     food_cost = 2
-    
+
 
     def action(self, gamestate):
         """Produce 1 additional food for the colony.
@@ -167,6 +184,10 @@ class HarvesterAnt(Ant):
         """
         # BEGIN Problem 1
         "*** YOUR CODE HERE ***"
+        """
+        harvest Ant 의 action(action은 매 턴을 의미한다.)이 진행되면,
+        gamestate의 food 값이 1 올라간다.
+        """
         gamestate.food += 1
         # END Problem 1
 
@@ -179,6 +200,8 @@ class ThrowerAnt(Ant):
     damage = 1
     # ADD/OVERRIDE CLASS ATTRIBUTES HERE
     food_cost = 3
+    max_range = float('inf')
+    min_range = 0
 
     def nearest_bee(self, beehive):
         """Return the nearest Bee in a Place that is not the HIVE (beehive), connected to
@@ -187,7 +210,38 @@ class ThrowerAnt(Ant):
         This method returns None if there is no such Bee (or none in range).
         """
         # BEGIN Problem 3 and 4
-        return bee_selector(self.place.bees)  # REPLACE THIS LINE
+        """
+        problem 3
+        현재 thrower_ant의 place 값을 갖고 난후, 
+        이 thrower_ant의 entrance를 통해서 오른쪽으로 이동한다.
+        그리고 그 자리의 place.bees라는 리스트를 통해서, bee의 마리수를 파악한다.
+        0마리가 아닐경우 벌들이 존재하므로, 가장 가까운 entrance의 random한 bee를 return 할 것이다.
+        만약 그 라인에 아무것도 없는 경우, (is.hive() == True 일 경우) None을 return 해준다.
+        thrower_ant_place = self.place
+        while not thrower_ant_place.is_hive():
+            if len(thrower_ant_place.bees) != 0:
+                return bee_selector(thrower_ant_place.bees)
+            thrower_ant_place = thrower_ant_place.entrance
+        return None
+        """
+        
+        """
+        problem 4
+        ShortThrower 이랑 LongThrower은 최소 값과 최대값이 주어진다.
+        이 경우 distance 를 주어지게 하고, 거리에 맞게끔 공격할수 있는 range를 부여한뒤에, 
+        if 문에 bees 리스트 길이를 체크 해주고, distance range를 체크해 준뒤, 
+        가장 가까운것들을 return 하는 원리를 갖는다.
+        """
+        
+        thrower_ant_place = self.place
+        distance = 0
+        while not thrower_ant_place.is_hive():
+            if len(thrower_ant_place.bees) != 0 and (self.min_range <= distance <= self.max_range):
+                return bee_selector(thrower_ant_place.bees)
+            thrower_ant_place = thrower_ant_place.entrance
+            distance += 1
+        return None
+        # REPLACE THIS LINE
         # END Problem 3 and 4
 
     def throw_at(self, target):
@@ -217,8 +271,9 @@ class ShortThrower(ThrowerAnt):
     name = 'Short'
     food_cost = 2
     # OVERRIDE CLASS ATTRIBUTES HERE
+    max_range = 3
     # BEGIN Problem 4
-    implemented = False   # Change to True to view in the GUI
+    implemented = True   # Change to True to view in the GUI
     # END Problem 4
 
 
@@ -228,8 +283,9 @@ class LongThrower(ThrowerAnt):
     name = 'Long'
     food_cost = 2
     # OVERRIDE CLASS ATTRIBUTES HERE
+    min_range = 5
     # BEGIN Problem 4
-    implemented = False   # Change to True to view in the GUI
+    implemented = True   # Change to True to view in the GUI
     # END Problem 4
 
 
@@ -241,7 +297,7 @@ class FireAnt(Ant):
     food_cost = 5
     # OVERRIDE CLASS ATTRIBUTES HERE
     # BEGIN Problem 5
-    implemented = False   # Change to True to view in the GUI
+    implemented = True   # Change to True to view in the GUI
     # END Problem 5
 
     def __init__(self, health=3):
@@ -256,15 +312,80 @@ class FireAnt(Ant):
         the additional damage if the fire ant dies.
         """
         # BEGIN Problem 5
+        """proble 5 
+           amount는 bee의 공격력이고, 
+           amount 만큼의 공격을 받는다.
+           그 다음 fire ant 의 특성상, 공격을 받을경우 반사 데미지를 준다.
+           이때, 공격한 bee에게만 데미지를 주는것이 아닌, 그 bee와 같은 자리에 머물러 있는 bee
+           들에게도 공격을 해준다. 
+           그리고 만약, fire ant 가 죽게 된다면, fire ant의 데미지 만큼 공격한 bee와 같은 자리에 잇는
+           bee들에게 fire ant damage를 주게 된다.
+        """
+        self.health -= amount
+        for bee in self.place.bees[:]:
+            bee.reduce_health(amount)
+        
+        if self.health <= 0:
+            for bee in self.place.bees[:]:
+                bee.reduce_health(self.damage)
+        super().reduce_health(0)
         "*** YOUR CODE HERE ***"
+
         # END Problem 5
 
 # BEGIN Problem 6
 # The WallAnt class
+"""
+    아무것도 하지 않는다. 그냥 가만히 서있는 벽같은 개미라 하여, 
+    wallant.
+    food_cost = 4
+    initial_health = 4
+
+    initial_health 를 정해주기 위해서는 
+    def __init__을 사용하여 정의 해 준다.
+"""
+class WallAnt(Ant):
+    """A WallAnt that only protecting the other ant."""
+    name = 'Wall'
+    food_cost = 4
+    # OVERRIDE CLASS ATTRIBUTES HERE
+    def __init__(self, health=4):
+        super().__init__(health)
+    implemented = True   # Change to True to view in the GUI
 # END Problem 6
 
 # BEGIN Problem 7
 # The HungryAnt Class
+class HungryAnt(Ant):
+    """A HungryAnt that eating the bees when his chewing count is under 0."""
+    name = 'Hungry'
+    food_cost = 4
+    # OVERRIDE CLASS ATTRIBUTES HERE
+    chew_duration = 3
+
+    implemented = True   # Change to True to view in the GUI
+
+    
+    def __init__(self, health=1):
+        super().__init__(health)
+        self.chewing = 0
+    """
+        when chewing count is under 0 and there are bees on its place
+        그중에 랜덤으로 벌을 한마리 정해서 먹는다.
+        이 때 한마리를 먹으면, 3턴 동안은 다시 먹지를 못하기 때문에,
+        각 object 성질을 이용해서, 각 hungry ant에게 따로 class attribute를 부여하여,
+        3턴동안은 digesting 시간을 준다. 그리고 다시 chewing이 under 0 이 되면, 
+        다시 먹을수 있게끔 해준다.
+    """
+    def action(self, gamestate):
+        if self.chewing <= 0 and len(self.place.bees) != 0:
+            choose = bee_selector(self.place.bees)
+            choose.health = 0
+            choose.reduce_health(0)
+            self.chewing = self.chew_duration
+        else:    
+            self.chewing -= 1
+        # END Problem 1
 # END Problem 7
 
 
@@ -279,11 +400,15 @@ class ContainerAnt(Ant):
     def can_contain(self, other):
         # BEGIN Problem 8
         "*** YOUR CODE HERE ***"
+        if self.contained_ant is None and not other.is_container():
+            return True
+        return False
         # END Problem 8
 
     def contain_ant(self, ant):
         # BEGIN Problem 8
         "*** YOUR CODE HERE ***"
+        self.contained_ant = ant
         # END Problem 8
 
     def remove_ant(self, ant):
@@ -304,6 +429,8 @@ class ContainerAnt(Ant):
     def action(self, gamestate):
         # BEGIN Problem 8
         "*** YOUR CODE HERE ***"
+        if self.contained_ant:
+            self.contained_ant.action(gamestate)
         # END Problem 8
 
 
@@ -314,11 +441,29 @@ class BodyguardAnt(ContainerAnt):
     food_cost = 4
     # OVERRIDE CLASS ATTRIBUTES HERE
     # BEGIN Problem 8
-    implemented = False   # Change to True to view in the GUI
+    implemented = True   # Change to True to view in the GUI
+
+    def __init__(self, health=2):
+        super().__init__(health)
     # END Problem 8
 
 # BEGIN Problem 9
 # The TankAnt class
+class TankAnt(ContainerAnt):
+
+    name = 'Tank'
+    food_cost = 6
+    damage = 1
+    implemented = True
+
+    def __init__(self, health=2):
+        super().__init__(health)
+    
+    def action(self, gamestate):
+        if self.contained_ant:
+            self.contained_ant.action(gamestate)
+        for bee in self.place.bees[:]:
+            bee.reduce_health(self.damage)
 # END Problem 9
 
 
@@ -330,10 +475,19 @@ class Water(Place):
         its health to 0."""
         # BEGIN Problem 10
         "*** YOUR CODE HERE ***"
+        super().add_insect(insect)
+        if not insect.is_watersafe:
+            insect.reduce_health(insect.health)
         # END Problem 10
 
 # BEGIN Problem 11
 # The ScubaThrower class
+class ScubaThrower(ThrowerAnt):
+    name = 'Scuba'
+    food_cost = 6
+    is_watersafe = True
+    implemented = True
+
 # END Problem 11
 
 # BEGIN Problem EC
@@ -390,6 +544,7 @@ class Bee(Insect):
     name = 'Bee'
     damage = 1
     # OVERRIDE CLASS ATTRIBUTES HERE
+    is_watersafe = True
 
     def sting(self, ant):
         """Attack an ANT, reducing its health by 1."""
